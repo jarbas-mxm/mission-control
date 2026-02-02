@@ -127,3 +127,37 @@ export const remove = mutation({
     return { deleted: args.name };
   },
 });
+
+// Atualizar agente por nome (para sync externo)
+export const updateByName = mutation({
+  args: {
+    name: v.string(),
+    status: v.optional(v.union(v.literal("idle"), v.literal("working"), v.literal("offline"))),
+    lastSeen: v.optional(v.number()),
+    currentTaskId: v.optional(v.id("tasks")),
+    sessionKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+    
+    if (!agent) {
+      // Agente não existe, ignorar silenciosamente
+      return null;
+    }
+    
+    const updates: Record<string, any> = {};
+    if (args.status !== undefined) updates.status = args.status;
+    if (args.lastSeen !== undefined) updates.lastSeen = args.lastSeen;
+    if (args.currentTaskId !== undefined) updates.currentTaskId = args.currentTaskId;
+    if (args.sessionKey !== undefined) updates.sessionKey = args.sessionKey;
+    
+    if (Object.keys(updates).length > 0) {
+      await ctx.db.patch(agent._id, updates);
+    }
+    
+    return agent._id;
+  },
+});
