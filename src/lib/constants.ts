@@ -42,21 +42,30 @@ export const TASK_STATUS = {
 export const AGENT_STATUS = {
   working: {
     label: "WORKING",
+    icon: "🟢",
     dot: "bg-green-500",
     text: "text-green-600",
     bg: "bg-green-50",
+    card: "bg-green-50 border-green-200",
+    avatar: "from-green-100 to-green-200",
   },
   idle: {
     label: "IDLE",
+    icon: "💤",
     dot: "bg-stone-400",
     text: "text-stone-500",
     bg: "bg-stone-50",
+    card: "bg-white border-stone-200",
+    avatar: "from-stone-100 to-stone-200",
   },
   offline: {
     label: "OFFLINE",
+    icon: "🔴",
     dot: "bg-red-400",
     text: "text-red-500",
     bg: "bg-red-50",
+    card: "bg-stone-50 border-stone-200 opacity-60",
+    avatar: "from-stone-100 to-stone-200",
   },
 } as const;
 
@@ -64,18 +73,21 @@ export const AGENT_STATUS = {
 export const AGENT_LEVEL = {
   lead: {
     label: "LEAD",
+    icon: "👑",
     bg: "bg-amber-100",
     text: "text-amber-700",
     border: "border-amber-200",
   },
   specialist: {
     label: "SPC",
+    icon: "⚡",
     bg: "bg-blue-100",
     text: "text-blue-700",
     border: "border-blue-200",
   },
   intern: {
     label: "INT",
+    icon: "📚",
     bg: "bg-stone-100",
     text: "text-stone-600",
     border: "border-stone-200",

@@ -106,10 +106,11 @@ export const create = mutation({
     }
 
     let createdBy = undefined;
-    if (args.createdByName) {
+    const createdByName = args.createdByName;
+    if (createdByName) {
       const creator = await ctx.db
         .query("agents")
-        .withIndex("by_name", (q) => q.eq("name", args.createdByName))
+        .withIndex("by_name", (q) => q.eq("name", createdByName))
         .first();
       if (creator) createdBy = creator._id;
     }
@@ -142,11 +143,12 @@ export const create = mutation({
     // Notificar assignees
     for (const agentId of assigneeIds) {
       const agent = await ctx.db.get(agentId);
+      const agentName = (agent as any)?.name || "Unknown";
       await ctx.db.insert("activities", {
         type: "task_assigned",
         agentId,
         taskId,
-        message: `${agent?.name} was assigned to "${args.title}"`,
+        message: `${agentName} was assigned to "${args.title}"`,
         createdAt: now,
       });
     }
@@ -196,10 +198,11 @@ export const updateStatus = mutation({
 
     // Registrar atividade
     let agentId = undefined;
-    if (args.agentName) {
+    const agentName = args.agentName;
+    if (agentName) {
       const agent = await ctx.db
         .query("agents")
-        .withIndex("by_name", (q) => q.eq("name", args.agentName))
+        .withIndex("by_name", (q) => q.eq("name", agentName))
         .first();
       if (agent) agentId = agent._id;
     }
@@ -248,11 +251,12 @@ export const assign = mutation({
     // Registrar atividades e notificações
     for (const agentId of assigneeIds) {
       const agent = await ctx.db.get(agentId);
+      const assigneeName = (agent as any)?.name || "Unknown";
       await ctx.db.insert("activities", {
         type: "task_assigned",
         agentId,
         taskId: args.id,
-        message: `${agent?.name} was assigned to "${task.title}"`,
+        message: `${assigneeName} was assigned to "${task.title}"`,
         createdAt: now,
       });
 
@@ -283,10 +287,11 @@ export const addComment = mutation({
     let agentId = undefined;
     let displayName = args.senderName || "Unknown";
 
-    if (args.agentName) {
+    const argAgentName = args.agentName;
+    if (argAgentName) {
       const agent = await ctx.db
         .query("agents")
-        .withIndex("by_name", (q) => q.eq("name", args.agentName))
+        .withIndex("by_name", (q) => q.eq("name", argAgentName))
         .first();
       if (agent) {
         agentId = agent._id;
