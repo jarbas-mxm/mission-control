@@ -8,6 +8,7 @@ import { formatTimeAgo } from "@/lib/utils";
 import { TASK_STATUS, TAG_COLORS, type TaskStatus } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { TaskDetailModal } from "@/components/task-detail-modal";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const COLUMN_ORDER: TaskStatus[] = [
@@ -24,6 +25,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ filterAgentId, onCreateTask }: KanbanBoardProps) {
+  const [selectedTaskId, setSelectedTaskId] = useState<Id<"tasks"> | null>(null);
   const kanban = useQuery(api.tasks.getKanban);
   const isLoading = kanban === undefined;
 
@@ -68,11 +70,21 @@ export function KanbanBoard({ filterAgentId, onCreateTask }: KanbanBoardProps) {
                 status={status}
                 tasks={filteredTasks as Task[]}
                 isLoading={isLoading}
+                onOpenTask={setSelectedTaskId}
               />
             );
           })}
         </div>
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTaskId && (
+        <TaskDetailModal
+          open={!!selectedTaskId}
+          onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          taskId={selectedTaskId}
+        />
+      )}
     </div>
   );
 }
@@ -96,10 +108,12 @@ function KanbanColumn({
   status,
   tasks,
   isLoading,
+  onOpenTask,
 }: {
   status: TaskStatus;
   tasks: Task[];
   isLoading: boolean;
+  onOpenTask?: (taskId: Id<"tasks">) => void;
 }) {
   const config = TASK_STATUS[status];
 
@@ -140,7 +154,13 @@ function KanbanColumn({
             <TaskCardSkeleton />
           </>
         ) : tasks.length > 0 ? (
-          tasks.map((task) => <TaskCard key={task._id} task={task} />)
+          tasks.map((task) => (
+            <TaskCard
+              key={task._id}
+              task={task}
+              onOpenDetail={() => onOpenTask?.(task._id)}
+            />
+          ))
         ) : (
           <div className="py-8 md:py-12 text-center">
             <span className="text-xl md:text-2xl opacity-30">{config.icon}</span>
@@ -151,7 +171,7 @@ function KanbanColumn({
   );
 }
 
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ task, onOpenDetail }: { task: Task; onOpenDetail?: () => void }) {
   const [showMenu, setShowMenu] = useState(false);
   const updateStatus = useMutation(api.tasks.updateStatus);
   const deleteTask = useMutation(api.tasks.remove);
@@ -180,9 +200,10 @@ function TaskCard({ task }: { task: Task }) {
 
   return (
     <div
+      onClick={() => !showMenu && onOpenDetail?.()}
       className={cn(
         "bg-white rounded-lg p-2.5 md:p-3 shadow-sm border border-stone-200",
-        "hover:shadow-md hover:border-stone-300 transition-all",
+        "hover:shadow-md hover:border-stone-300 transition-all cursor-pointer",
         "group relative"
       )}
     >
@@ -197,7 +218,7 @@ function TaskCard({ task }: { task: Task }) {
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded hover:bg-stone-100 opacity-0 group-hover:opacity-100 transition-opacity text-stone-400"
+        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded hover:bg-stone-100 opacity-0 group-hover:opacity-100 transition-opacity text-stone-400 z-10"
       >
         ⋯
       </button>

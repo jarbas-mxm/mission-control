@@ -51,6 +51,68 @@ export const get = query({
   },
 });
 
+// Detalhe completo da task com histórico e assignees
+export const getDetail = query({
+  args: { id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.id);
+    if (!task) return null;
+
+    // Buscar assignees
+    const agents = await ctx.db.query("agents").collect();
+    const assignees = task.assigneeIds
+      .map((id) => agents.find((a) => a._id === id))
+      .filter(Boolean);
+
+    // Buscar criador
+    const creator = task.createdBy
+      ? agents.find((a) => a._id === task.createdBy)
+      : null;
+
+    // Buscar histórico de atividades da task
+    const activities = await ctx.db
+      .query("activities")
+      .withIndex("by_created")
+      .order("desc")
+      .collect();
+
+    const taskActivities = activities
+      .filter((a) => a.taskId === args.id)
+      .slice(0, 50)
+      .map((a) => {
+        const agent = a.agentId ? agents.find((ag) => ag._id === a.agentId) : null;
+        return {
+          ...a,
+          agentName: agent?.name,
+          agentEmoji: agent?.emoji,
+        };
+      });
+
+    // Buscar comentários da task
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_task", (q) => q.eq("taskId", args.id))
+      .collect();
+
+    const comments = messages.map((m) => {
+      const agent = m.agentId ? agents.find((ag) => ag._id === m.agentId) : null;
+      return {
+        ...m,
+        agentName: agent?.name || m.senderName,
+        agentEmoji: agent?.emoji,
+      };
+    });
+
+    return {
+      ...task,
+      assignees,
+      creator,
+      activities: taskActivities,
+      comments,
+    };
+  },
+});
+
 export const getKanban = query({
   args: {},
   handler: async (ctx) => {
@@ -322,6 +384,92 @@ export const addComment = mutation({
     });
 
     return args.taskId;
+  },
+});
+
+// Adicionar entrega/anexo à task
+export const addDeliverable = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    title: v.string(),
+    url: v.string(),
+    type: v.optional(v.union(
+      v.literal("file"),
+      v.literal("link"),
+      v.literal("sheet"),
+      v.literal("doc"),
+      v.literal("other")
+    )),
+    addedByName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) throw new Error("Task not found");
+
+    const now = Date.now();
+    const deliverable = {
+      title: args.title,
+      url: args.url,
+      type: args.type || "link",
+      addedBy: args.addedByName,
+      addedAt: now,
+    };
+
+    const existingDeliverables = task.deliverables || [];
+
+    await ctx.db.patch(args.taskId, {
+      deliverables: [...existingDeliverables, deliverable],
+      updatedAt: now,
+    });
+
+    // Registrar atividade
+    await ctx.db.insert("activities", {
+      type: "task_updated",
+      taskId: args.taskId,
+      message: `Deliverable added to "${task.title}": ${args.title}`,
+      metadata: { deliverable },
+      createdAt: now,
+    });
+
+    return args.taskId;
+  },
+});
+
+// Remover entrega/anexo da task
+export const removeDeliverable = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    url: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) throw new Error("Task not found");
+
+    const deliverables = (task.deliverables || []).filter(
+      (d) => d.url !== args.url
+    );
+
+    await ctx.db.patch(args.taskId, {
+      deliverables,
+      updatedAt: Date.now(),
+    });
+
+    return args.taskId;
+  },
+});
+
+// Atualizar descrição da task
+export const updateDescription = mutation({
+  args: {
+    id: v.id("tasks"),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      description: args.description,
+      updatedAt: Date.now(),
+    });
+    return args.id;
   },
 });
 

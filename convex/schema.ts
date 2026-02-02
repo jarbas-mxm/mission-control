@@ -55,6 +55,20 @@ export default defineSchema({
     // Estimativas
     estimatedMinutes: v.optional(v.number()),
     actualMinutes: v.optional(v.number()),
+    // Entregas/Anexos
+    deliverables: v.optional(v.array(v.object({
+      title: v.string(),
+      url: v.string(),
+      type: v.optional(v.union(
+        v.literal("file"),
+        v.literal("link"),
+        v.literal("sheet"),
+        v.literal("doc"),
+        v.literal("other")
+      )),
+      addedBy: v.optional(v.string()),
+      addedAt: v.number(),
+    }))),
   })
     .index("by_status", ["status"])
     .index("by_assignee", ["assigneeIds"])
