@@ -92,4 +92,27 @@ export default defineSchema({
   })
     .index("by_agent", ["mentionedAgentId"])
     .index("by_undelivered", ["mentionedAgentId", "delivered"]),
+
+  // Métricas de uso (coletadas periodicamente)
+  metrics: defineTable({
+    type: v.union(
+      v.literal("daily"),      // snapshot diário
+      v.literal("session"),    // por sessão
+      v.literal("aggregate")   // agregado geral
+    ),
+    date: v.string(),          // YYYY-MM-DD
+    sessionKey: v.optional(v.string()),
+    agentId: v.optional(v.id("agents")),
+    totalTokens: v.number(),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    cost: v.optional(v.number()),        // USD
+    requestCount: v.optional(v.number()),
+    avgLatency: v.optional(v.number()),  // ms
+    model: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_type_date", ["type", "date"])
+    .index("by_session", ["sessionKey"]),
 });

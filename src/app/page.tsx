@@ -14,10 +14,11 @@ import { KanbanColumn } from "@/components/kanban-column";
 import { TaskFilters } from "@/components/task-filters";
 import { MessageList } from "@/components/message-list";
 import { ActivityFeed } from "@/components/activity-feed";
+import { MetricsDashboard, MetricsCompact } from "@/components/metrics-dashboard";
 
 type Priority = "all" | "high" | "medium" | "low";
 type MobileView = "kanban" | "agents" | "chat";
-type SidebarTab = "chat" | "feed";
+type SidebarTab = "chat" | "feed" | "metrics";
 
 export default function MissionControl() {
   // Data
@@ -238,11 +239,19 @@ export default function MissionControl() {
               icon="📰"
               label="Feed"
             />
+            <TabButton
+              active={sidebarTab === "metrics"}
+              onClick={() => setSidebarTab("metrics")}
+              icon="📊"
+              label="Stats"
+            />
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4">
-            {sidebarTab === "feed" ? (
+            {sidebarTab === "metrics" ? (
+              <MetricsDashboard />
+            ) : sidebarTab === "feed" ? (
               <ActivityFeed
                 activities={activities}
                 isLoading={activities === undefined}
