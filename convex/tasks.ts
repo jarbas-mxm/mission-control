@@ -16,7 +16,6 @@ export const listByStatus = query({
       v.literal("inbox"),
       v.literal("assigned"),
       v.literal("in_progress"),
-      v.literal("review"),
       v.literal("done"),
       v.literal("blocked")
     ),
@@ -131,7 +130,6 @@ export const getKanban = query({
       inbox: enrichedTasks.filter((t) => t.status === "inbox"),
       assigned: enrichedTasks.filter((t) => t.status === "assigned"),
       in_progress: enrichedTasks.filter((t) => t.status === "in_progress"),
-      review: enrichedTasks.filter((t) => t.status === "review"),
       done: enrichedTasks.filter((t) => t.status === "done"),
       blocked: enrichedTasks.filter((t) => t.status === "blocked"),
     };
@@ -226,7 +224,6 @@ export const updateStatus = mutation({
       v.literal("inbox"),
       v.literal("assigned"),
       v.literal("in_progress"),
-      v.literal("review"),
       v.literal("done"),
       v.literal("blocked")
     ),

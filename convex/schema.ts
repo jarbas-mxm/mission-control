@@ -36,7 +36,6 @@ export default defineSchema({
       v.literal("inbox"),
       v.literal("assigned"),
       v.literal("in_progress"),
-      v.literal("review"),
       v.literal("done"),
       v.literal("blocked")
     ),
@@ -189,4 +188,23 @@ export default defineSchema({
     .index("by_date", ["date"])
     .index("by_type_date", ["type", "date"])
     .index("by_session", ["sessionKey"]),
+
+  // Logs do terminal (para visualização em tempo real)
+  terminalLogs: defineTable({
+    agentId: v.id("agents"),
+    level: v.union(
+      v.literal("info"),
+      v.literal("success"),
+      v.literal("warning"),
+      v.literal("error"),
+      v.literal("system")
+    ),
+    message: v.string(),
+    taskId: v.optional(v.id("tasks")),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_agent_created", ["agentId", "createdAt"])
+    .index("by_created", ["createdAt"]),
 });

@@ -43,7 +43,6 @@ export const getStats = query({
         inbox: tasks.filter((t) => t.status === "inbox").length,
         assigned: tasks.filter((t) => t.status === "assigned").length,
         in_progress: tasks.filter((t) => t.status === "in_progress").length,
-        review: tasks.filter((t) => t.status === "review").length,
         done: tasks.filter((t) => t.status === "done").length,
       },
     };
@@ -200,7 +199,6 @@ export const completeTask = mutation({
   args: {
     agentName: v.string(),
     taskId: v.id("tasks"),
-    moveToReview: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const agent = await ctx.db
@@ -214,7 +212,6 @@ export const completeTask = mutation({
     if (!task) throw new Error("Task not found");
 
     const now = Date.now();
-    const newStatus = args.moveToReview ? "review" : "done";
 
     // Calcula tempo gasto
     const actualMinutes = task.startedAt
@@ -223,7 +220,7 @@ export const completeTask = mutation({
 
     // Atualiza task
     await ctx.db.patch(args.taskId, {
-      status: newStatus,
+      status: "done",
       completedAt: now,
       actualMinutes,
       updatedAt: now,
@@ -248,6 +245,36 @@ export const completeTask = mutation({
     });
 
     return { agentId: agent._id, taskId: args.taskId };
+  },
+});
+
+// Atualizar status do agente (para API externa)
+export const updateStatus = mutation({
+  args: {
+    id: v.id("agents"),
+    status: v.union(
+      v.literal("working"),
+      v.literal("idle"),
+      v.literal("offline")
+    ),
+    currentTask: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db.get(args.id);
+    if (!agent) throw new Error("Agent not found");
+
+    const updates: any = {
+      status: args.status,
+      lastSeen: Date.now(),
+    };
+
+    // Se status não for working, limpa currentTaskId
+    if (args.status !== "working") {
+      updates.currentTaskId = undefined;
+    }
+
+    await ctx.db.patch(args.id, updates);
+    return agent._id;
   },
 });
 

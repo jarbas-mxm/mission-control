@@ -18,12 +18,6 @@ export const TASK_STATUS = {
     color: "bg-blue-50",
     headerColor: "text-blue-600",
   },
-  review: {
-    label: "Review",
-    icon: "👁",
-    color: "bg-purple-50",
-    headerColor: "text-purple-600",
-  },
   done: {
     label: "Done",
     icon: "✅",

@@ -5,6 +5,8 @@ import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { AGENT_STATUS, AGENT_LEVEL } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgentTerminal } from "@/components/agent-terminal";
+import type { Id } from "../../convex/_generated/dataModel";
 
 interface Agent {
   _id: string;
@@ -46,6 +48,8 @@ export function AgentsSidebar({
   const activeCount =
     agents?.filter((a) => a.status !== "offline").length || 0;
 
+  const selectedAgent = agents?.find((a) => a._id === selectedAgentId);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -73,7 +77,10 @@ export function AgentsSidebar({
       )}
 
       {/* Agent List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={cn(
+        "overflow-y-auto",
+        selectedAgentId ? "flex-shrink-0 max-h-[40%]" : "flex-1"
+      )}>
         {isLoading ? (
           <div className="p-2 md:p-3 space-y-1 md:space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -101,6 +108,16 @@ export function AgentsSidebar({
           </div>
         )}
       </div>
+
+      {/* Agent Terminal */}
+      {selectedAgentId && selectedAgent && (
+        <div className="flex-1 border-t-2 border-stone-300 min-h-0">
+          <AgentTerminal 
+            agentId={selectedAgentId as Id<"agents">} 
+            agentName={selectedAgent.name}
+          />
+        </div>
+      )}
     </div>
   );
 }

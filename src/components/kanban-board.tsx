@@ -15,7 +15,6 @@ const COLUMN_ORDER: TaskStatus[] = [
   "inbox",
   "assigned",
   "in_progress",
-  "review",
   "done",
 ];
 
