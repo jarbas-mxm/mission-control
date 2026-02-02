@@ -14,6 +14,7 @@ import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
 import type * as notifications from "../notifications.js";
 import type * as tasks from "../tasks.js";
+import type * as usage from "../usage.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   metrics: typeof metrics;
   notifications: typeof notifications;
   tasks: typeof tasks;
+  usage: typeof usage;
 }>;
 
 /**

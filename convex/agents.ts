@@ -1,41 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Criar um novo agente
-export const create = mutation({
-  args: {
-    name: v.string(),
-    role: v.string(),
-    emoji: v.string(),
-    status: v.union(v.literal("idle"), v.literal("working"), v.literal("offline")),
-    level: v.union(v.literal("lead"), v.literal("specialist"), v.literal("intern")),
-    sessionKey: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    // Verificar se já existe
-    const existing = await ctx.db
-      .query("agents")
-      .withIndex("by_name", (q) => q.eq("name", args.name))
-      .first();
-    
-    if (existing) {
-      // Atualizar se já existe
-      await ctx.db.patch(existing._id, {
-        ...args,
-        lastSeen: Date.now(),
-      });
-      return existing._id;
-    }
-    
-    // Criar novo
-    return await ctx.db.insert("agents", {
-      ...args,
-      lastSeen: Date.now(),
-    });
-  },
-});
+// ============ QUERIES ============
 
-// Listar todos os agentes
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -43,7 +10,6 @@ export const list = query({
   },
 });
 
-// Buscar agente por nome
 export const getByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
@@ -54,65 +20,315 @@ export const getByName = query({
   },
 });
 
-// Buscar agente por sessionKey
-export const getBySessionKey = query({
-  args: { sessionKey: v.string() },
-  handler: async (ctx, args) => {
+export const getActive = query({
+  args: {},
+  handler: async (ctx) => {
     const agents = await ctx.db.query("agents").collect();
-    return agents.find(a => a.sessionKey === args.sessionKey);
+    return agents.filter((a) => a.status !== "offline");
   },
 });
 
-// Atualizar status do agente
-export const updateStatus = mutation({
+export const getStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const agents = await ctx.db.query("agents").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+
+    return {
+      totalAgents: agents.length,
+      activeAgents: agents.filter((a) => a.status !== "offline").length,
+      workingAgents: agents.filter((a) => a.status === "working").length,
+      totalTasks: tasks.length,
+      tasksByStatus: {
+        inbox: tasks.filter((t) => t.status === "inbox").length,
+        assigned: tasks.filter((t) => t.status === "assigned").length,
+        in_progress: tasks.filter((t) => t.status === "in_progress").length,
+        review: tasks.filter((t) => t.status === "review").length,
+        done: tasks.filter((t) => t.status === "done").length,
+      },
+    };
+  },
+});
+
+// ============ MUTATIONS ============
+
+export const create = mutation({
   args: {
     name: v.string(),
-    status: v.union(v.literal("idle"), v.literal("working"), v.literal("offline")),
-    currentTaskId: v.optional(v.id("tasks")),
+    role: v.string(),
+    emoji: v.string(),
+    level: v.union(
+      v.literal("lead"),
+      v.literal("specialist"),
+      v.literal("intern")
+    ),
+    avatar: v.optional(v.string()),
+    sessionKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const agent = await ctx.db
+    const existing = await ctx.db
       .query("agents")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
-    
-    if (!agent) throw new Error(`Agent ${args.name} not found`);
-    
-    await ctx.db.patch(agent._id, {
-      status: args.status,
-      currentTaskId: args.currentTaskId,
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        ...args,
+        status: "idle",
+        lastSeen: Date.now(),
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("agents", {
+      ...args,
+      status: "idle",
       lastSeen: Date.now(),
+      tasksCompleted: 0,
+      totalTokensUsed: 0,
     });
-    
-    // Registrar atividade
-    await ctx.db.insert("activities", {
-      type: "agent_status_changed",
-      agentId: agent._id,
-      message: `${args.name} está ${args.status === 'working' ? 'trabalhando' : args.status === 'idle' ? 'disponível' : 'offline'}`,
-      createdAt: Date.now(),
-    });
-    
-    return agent._id;
   },
 });
 
-// Heartbeat - atualiza lastSeen
-export const heartbeat = mutation({
+// Agente fica online
+export const goOnline = mutation({
   args: { name: v.string() },
   handler: async (ctx, args) => {
     const agent = await ctx.db
       .query("agents")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
-    
-    if (agent) {
-      await ctx.db.patch(agent._id, { lastSeen: Date.now() });
+
+    if (!agent) throw new Error(`Agent ${args.name} not found`);
+
+    const wasOffline = agent.status === "offline";
+
+    await ctx.db.patch(agent._id, {
+      status: "idle",
+      lastSeen: Date.now(),
+    });
+
+    if (wasOffline) {
+      await ctx.db.insert("activities", {
+        type: "agent_online",
+        agentId: agent._id,
+        message: `${args.name} is now online`,
+        createdAt: Date.now(),
+      });
     }
-    return agent?._id;
+
+    return agent._id;
   },
 });
 
-// Deletar agente por nome
+// Agente fica offline
+export const goOffline = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+
+    if (!agent) throw new Error(`Agent ${args.name} not found`);
+
+    await ctx.db.patch(agent._id, {
+      status: "offline",
+      currentTaskId: undefined,
+      lastSeen: Date.now(),
+    });
+
+    await ctx.db.insert("activities", {
+      type: "agent_offline",
+      agentId: agent._id,
+      message: `${args.name} went offline`,
+      createdAt: Date.now(),
+    });
+
+    return agent._id;
+  },
+});
+
+// Agente pega uma task (automação!)
+export const claimTask = mutation({
+  args: {
+    agentName: v.string(),
+    taskId: v.id("tasks"),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.agentName))
+      .first();
+
+    if (!agent) throw new Error(`Agent ${args.agentName} not found`);
+
+    const task = await ctx.db.get(args.taskId);
+    if (!task) throw new Error("Task not found");
+
+    const now = Date.now();
+
+    // Atualiza task para in_progress
+    await ctx.db.patch(args.taskId, {
+      status: "in_progress",
+      startedAt: now,
+      updatedAt: now,
+    });
+
+    // Atualiza agent para working
+    await ctx.db.patch(agent._id, {
+      status: "working",
+      currentTaskId: args.taskId,
+      lastSeen: now,
+    });
+
+    // Registra atividade
+    await ctx.db.insert("activities", {
+      type: "task_started",
+      agentId: agent._id,
+      taskId: args.taskId,
+      message: `${args.agentName} started working on "${task.title}"`,
+      createdAt: now,
+    });
+
+    return { agentId: agent._id, taskId: args.taskId };
+  },
+});
+
+// Agente completa uma task (automação!)
+export const completeTask = mutation({
+  args: {
+    agentName: v.string(),
+    taskId: v.id("tasks"),
+    moveToReview: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.agentName))
+      .first();
+
+    if (!agent) throw new Error(`Agent ${args.agentName} not found`);
+
+    const task = await ctx.db.get(args.taskId);
+    if (!task) throw new Error("Task not found");
+
+    const now = Date.now();
+    const newStatus = args.moveToReview ? "review" : "done";
+
+    // Calcula tempo gasto
+    const actualMinutes = task.startedAt
+      ? Math.round((now - task.startedAt) / 60000)
+      : undefined;
+
+    // Atualiza task
+    await ctx.db.patch(args.taskId, {
+      status: newStatus,
+      completedAt: now,
+      actualMinutes,
+      updatedAt: now,
+    });
+
+    // Atualiza agent
+    await ctx.db.patch(agent._id, {
+      status: "idle",
+      currentTaskId: undefined,
+      lastSeen: now,
+      tasksCompleted: (agent.tasksCompleted || 0) + 1,
+    });
+
+    // Registra atividade
+    await ctx.db.insert("activities", {
+      type: "task_completed",
+      agentId: agent._id,
+      taskId: args.taskId,
+      message: `${args.agentName} completed "${task.title}"`,
+      metadata: { actualMinutes },
+      createdAt: now,
+    });
+
+    return { agentId: agent._id, taskId: args.taskId };
+  },
+});
+
+// Heartbeat - mantém agente vivo
+export const heartbeat = mutation({
+  args: {
+    name: v.string(),
+    isWorking: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+
+    if (!agent) return null;
+
+    const updates: any = { lastSeen: Date.now() };
+
+    if (args.isWorking !== undefined) {
+      updates.status = args.isWorking ? "working" : "idle";
+    }
+
+    await ctx.db.patch(agent._id, updates);
+    return agent._id;
+  },
+});
+
+// Reportar uso de tokens
+export const reportUsage = mutation({
+  args: {
+    agentName: v.string(),
+    taskId: v.optional(v.id("tasks")),
+    sessionId: v.optional(v.string()),
+    model: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.agentName))
+      .first();
+
+    if (!agent) throw new Error(`Agent ${args.agentName} not found`);
+
+    // Calcular custo (aproximado, em centavos USD)
+    const costs: Record<string, { input: number; output: number }> = {
+      "claude-opus": { input: 0.015, output: 0.075 },
+      "claude-sonnet": { input: 0.003, output: 0.015 },
+      "claude-haiku": { input: 0.00025, output: 0.00125 },
+    };
+
+    const modelCost = costs[args.model] || costs["claude-sonnet"];
+    const cost = Math.round(
+      (args.inputTokens / 1000) * modelCost.input * 100 +
+        (args.outputTokens / 1000) * modelCost.output * 100
+    );
+
+    // Inserir registro de uso
+    await ctx.db.insert("usage", {
+      agentId: agent._id,
+      taskId: args.taskId,
+      sessionId: args.sessionId,
+      model: args.model,
+      inputTokens: args.inputTokens,
+      outputTokens: args.outputTokens,
+      cost,
+      createdAt: Date.now(),
+    });
+
+    // Atualizar total do agente
+    const totalTokens = args.inputTokens + args.outputTokens;
+    await ctx.db.patch(agent._id, {
+      totalTokensUsed: (agent.totalTokensUsed || 0) + totalTokens,
+    });
+
+    return { cost, totalTokens };
+  },
+});
+
 export const remove = mutation({
   args: { name: v.string() },
   handler: async (ctx, args) => {
@@ -120,44 +336,10 @@ export const remove = mutation({
       .query("agents")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
-    
+
     if (!agent) throw new Error(`Agent ${args.name} not found`);
-    
+
     await ctx.db.delete(agent._id);
     return { deleted: args.name };
-  },
-});
-
-// Atualizar agente por nome (para sync externo)
-export const updateByName = mutation({
-  args: {
-    name: v.string(),
-    status: v.optional(v.union(v.literal("idle"), v.literal("working"), v.literal("offline"))),
-    lastSeen: v.optional(v.number()),
-    currentTaskId: v.optional(v.id("tasks")),
-    sessionKey: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const agent = await ctx.db
-      .query("agents")
-      .withIndex("by_name", (q) => q.eq("name", args.name))
-      .first();
-    
-    if (!agent) {
-      // Agente não existe, ignorar silenciosamente
-      return null;
-    }
-    
-    const updates: Record<string, any> = {};
-    if (args.status !== undefined) updates.status = args.status;
-    if (args.lastSeen !== undefined) updates.lastSeen = args.lastSeen;
-    if (args.currentTaskId !== undefined) updates.currentTaskId = args.currentTaskId;
-    if (args.sessionKey !== undefined) updates.sessionKey = args.sessionKey;
-    
-    if (Object.keys(updates).length > 0) {
-      await ctx.db.patch(agent._id, updates);
-    }
-    
-    return agent._id;
   },
 });
