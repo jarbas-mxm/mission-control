@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { Clock } from "@/components/clock";
@@ -9,6 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function Header() {
   const stats = useQuery(api.agents.getStats);
   const isLoading = stats === undefined;
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch("/api/auth", { method: "DELETE" });
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <header className="bg-white border-b border-stone-200 px-6 py-4">
@@ -55,6 +63,14 @@ export function Header() {
               {stats ? "ONLINE" : "CONNECTING"}
             </div>
           </div>
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="text-stone-400 hover:text-stone-600 transition-colors text-sm"
+            title="Sair"
+          >
+            🚪
+          </button>
         </div>
       </div>
     </header>
