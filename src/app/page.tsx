@@ -30,6 +30,35 @@ function AgentCardSkeleton() {
   );
 }
 
+// Compact agent card for mobile
+function AgentCardCompact({ 
+  agent, 
+  isSelected, 
+  onClick 
+}: { 
+  agent: { _id: string; name: string; emoji: string; status: string; level: string };
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+        isSelected 
+          ? "bg-blue-100 border-blue-300 border" 
+          : "bg-white border border-stone-200 hover:border-stone-300"
+      }`}
+    >
+      <span className="text-lg">{agent.emoji}</span>
+      <span className="text-sm font-medium">{agent.name}</span>
+      <span className={`w-2 h-2 rounded-full ${
+        agent.status === "working" ? "bg-green-500" :
+        agent.status === "idle" ? "bg-stone-300" : "bg-red-400"
+      }`} />
+    </button>
+  );
+}
+
 // Loading card for tasks
 function TaskCardSkeleton() {
   return (
@@ -41,35 +70,20 @@ function TaskCardSkeleton() {
   );
 }
 
-// Error display component
-function ErrorDisplay({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="text-center py-8">
-      <div className="text-red-500 mb-2">⚠️ {message}</div>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          Tentar novamente
-        </button>
-      )}
-    </div>
-  );
-}
-
 // Stats counter with loading state
 function StatCounter({ 
   value, 
   label, 
-  loading 
+  loading,
+  className = ""
 }: { 
   value: number | undefined; 
   label: string; 
   loading: boolean;
+  className?: string;
 }) {
   return (
-    <div className="text-center">
+    <div className={`text-center ${className}`}>
       {loading ? (
         <Skeleton className="h-8 w-12 mx-auto mb-1" />
       ) : (
@@ -77,6 +91,48 @@ function StatCounter({
       )}
       <div className="text-xs text-stone-500 uppercase">{label}</div>
     </div>
+  );
+}
+
+// Mini stat for compact view
+function MiniStat({ value, label, icon }: { value: number; label: string; icon: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <span>{icon}</span>
+      <span className="font-semibold">{value}</span>
+      <span className="text-stone-500 hidden sm:inline">{label}</span>
+    </div>
+  );
+}
+
+// Filter pill component
+function FilterPill({ 
+  label, 
+  isActive, 
+  onClick, 
+  count 
+}: { 
+  label: string; 
+  isActive: boolean; 
+  onClick: () => void;
+  count?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+        isActive
+          ? "bg-blue-600 text-white"
+          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+      }`}
+    >
+      {label}
+      {count !== undefined && (
+        <span className={`ml-1.5 ${isActive ? "text-blue-200" : "text-stone-400"}`}>
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -90,6 +146,12 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [activeTab, setActiveTab] = useState<"feed" | "chat">("chat");
   const [isSending, setIsSending] = useState(false);
+  
+  // Filter states
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "high" | "medium" | "low">("all");
+  const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [mobileView, setMobileView] = useState<"kanban" | "agents" | "chat">("kanban");
 
   // Derive loading states
   const isAgentsLoading = agents === undefined;
@@ -100,20 +162,47 @@ export default function Home() {
   // Calculate connection status
   const isConnected = agents !== undefined || tasks !== undefined;
 
-  // Memoized task grouping
+  // Get unique tags from all tasks
+  const allTags = useMemo(() => {
+    if (!tasks) return [];
+    const tagSet = new Set<string>();
+    tasks.forEach(t => t.tags?.forEach(tag => tagSet.add(tag)));
+    return Array.from(tagSet).sort();
+  }, [tasks]);
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    if (!tasks) return [];
+    return tasks.filter(task => {
+      // Priority filter
+      if (priorityFilter !== "all" && task.priority !== priorityFilter) {
+        return false;
+      }
+      // Agent filter
+      if (agentFilter && !task.assigneeIds.includes(agentFilter as any)) {
+        return false;
+      }
+      return true;
+    });
+  }, [tasks, priorityFilter, agentFilter]);
+
+  // Memoized task grouping with filters
   const tasksByStatus = useMemo(() => ({
-    inbox: tasks?.filter((t) => t.status === "inbox") || [],
-    assigned: tasks?.filter((t) => t.status === "assigned") || [],
-    in_progress: tasks?.filter((t) => t.status === "in_progress") || [],
-    review: tasks?.filter((t) => t.status === "review") || [],
-    done: tasks?.filter((t) => t.status === "done") || [],
-  }), [tasks]);
+    inbox: filteredTasks.filter((t) => t.status === "inbox"),
+    assigned: filteredTasks.filter((t) => t.status === "assigned"),
+    in_progress: filteredTasks.filter((t) => t.status === "in_progress"),
+    review: filteredTasks.filter((t) => t.status === "review"),
+    done: filteredTasks.filter((t) => t.status === "done"),
+  }), [filteredTasks]);
 
   // Count active (working) agents
   const activeAgentsCount = useMemo(() => 
     agents?.filter(a => a.status === "working").length || 0,
     [agents]
   );
+
+  // Check if any filters are active
+  const hasActiveFilters = priorityFilter !== "all" || agentFilter !== null;
 
   const statusLabels: Record<string, string> = {
     inbox: "INBOX",
@@ -157,16 +246,23 @@ export default function Home() {
     }
   };
 
+  const clearFilters = () => {
+    setPriorityFilter("all");
+    setAgentFilter(null);
+  };
+
   return (
     <div className="min-h-screen bg-stone-50">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 px-6 py-4">
+      <header className="bg-white border-b border-stone-200 px-4 lg:px-6 py-3 lg:py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">◇</span>
-            <h1 className="text-xl font-semibold text-stone-800">MISSION CONTROL</h1>
+          <div className="flex items-center gap-2 lg:gap-3">
+            <span className="text-xl lg:text-2xl">◇</span>
+            <h1 className="text-lg lg:text-xl font-semibold text-stone-800">MISSION CONTROL</h1>
           </div>
-          <div className="flex items-center gap-6">
+          
+          {/* Desktop stats */}
+          <div className="hidden md:flex items-center gap-6">
             <StatCounter 
               value={agents?.length} 
               label="Agents" 
@@ -193,12 +289,61 @@ export default function Home() {
               {isConnected ? "CONNECTED" : "CONNECTING..."}
             </div>
           </div>
+          
+          {/* Mobile stats */}
+          <div className="flex md:hidden items-center gap-3">
+            {!isAgentsLoading && !isTasksLoading && (
+              <>
+                <MiniStat value={agents?.length || 0} label="agents" icon="🤖" />
+                <MiniStat value={tasks?.length || 0} label="tasks" icon="📋" />
+              </>
+            )}
+            <div className={`w-2 h-2 rounded-full ${
+              isConnected ? "bg-green-500" : "bg-yellow-500 animate-pulse"
+            }`} />
+          </div>
+        </div>
+        
+        {/* Mobile navigation */}
+        <div className="flex md:hidden mt-3 gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setMobileView("kanban")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+              mobileView === "kanban" 
+                ? "bg-blue-600 text-white" 
+                : "bg-stone-100 text-stone-600"
+            }`}
+          >
+            📋 Tasks
+          </button>
+          <button
+            onClick={() => setMobileView("agents")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+              mobileView === "agents" 
+                ? "bg-blue-600 text-white" 
+                : "bg-stone-100 text-stone-600"
+            }`}
+          >
+            🤖 Agents
+          </button>
+          <button
+            onClick={() => setMobileView("chat")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+              mobileView === "chat" 
+                ? "bg-blue-600 text-white" 
+                : "bg-stone-100 text-stone-600"
+            }`}
+          >
+            💬 Chat
+          </button>
         </div>
       </header>
 
       <div className="flex">
-        {/* Sidebar - Agents */}
-        <aside className="w-80 bg-white border-r border-stone-200 p-4 min-h-[calc(100vh-73px)]">
+        {/* Sidebar - Agents (desktop only or mobile when selected) */}
+        <aside className={`${
+          mobileView === "agents" ? "flex" : "hidden"
+        } md:flex w-full md:w-80 bg-white border-r border-stone-200 p-4 min-h-[calc(100vh-73px)] md:min-h-[calc(100vh-73px)] flex-col`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-stone-600 uppercase tracking-wide">Agents</h2>
             {isAgentsLoading ? (
@@ -210,16 +355,14 @@ export default function Home() {
             )}
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 overflow-y-auto">
             {isAgentsLoading ? (
-              // Show skeletons while loading
               <>
                 <AgentCardSkeleton />
                 <AgentCardSkeleton />
                 <AgentCardSkeleton />
               </>
             ) : agents && agents.length > 0 ? (
-              // Sort agents: working first, then idle, then offline
               [...agents]
                 .sort((a, b) => {
                   const statusOrder = { working: 0, idle: 1, offline: 2 };
@@ -228,17 +371,22 @@ export default function Home() {
                 .map((agent) => (
                   <div
                     key={agent._id}
-                    className={`p-3 rounded-xl border transition-all ${
-                      agent.status === "working" 
-                        ? "bg-green-50 border-green-200 shadow-sm" 
+                    onClick={() => setAgentFilter(agentFilter === agent._id ? null : agent._id)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                      agentFilter === agent._id
+                        ? "bg-blue-50 border-blue-300 ring-2 ring-blue-200"
+                        : agent.status === "working" 
+                        ? "bg-green-50 border-green-200 shadow-sm hover:border-green-300" 
                         : agent.status === "offline"
-                        ? "bg-stone-50 border-stone-200 opacity-60"
+                        ? "bg-stone-50 border-stone-200 opacity-60 hover:opacity-80"
                         : "bg-white border-stone-200 hover:border-stone-300"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm ${
-                        agent.status === "working"
+                        agentFilter === agent._id
+                          ? "bg-gradient-to-br from-blue-100 to-blue-200"
+                          : agent.status === "working"
                           ? "bg-gradient-to-br from-green-100 to-green-200"
                           : "bg-gradient-to-br from-stone-100 to-stone-200"
                       }`}>
@@ -288,19 +436,81 @@ export default function Home() {
         </aside>
 
         {/* Main Content - Kanban */}
-        <main className="flex-1 min-w-0 p-6 overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-stone-600 uppercase">Mission Queue</h2>
-            {!isTasksLoading && tasks && tasks.length > 0 && (
-              <div className="text-xs text-stone-400">
-                {tasksByStatus.in_progress.length} in progress • {tasksByStatus.done.length} completed
-              </div>
-            )}
+        <main className={`${
+          mobileView === "kanban" ? "flex" : "hidden"
+        } md:flex flex-1 min-w-0 p-4 lg:p-6 overflow-hidden flex-col`}>
+          {/* Filters bar */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-stone-600 uppercase">Mission Queue</h2>
+              {!isTasksLoading && tasks && (
+                <div className="text-xs text-stone-400">
+                  {hasActiveFilters 
+                    ? `${filteredTasks.length} of ${tasks.length} tasks`
+                    : `${tasksByStatus.in_progress.length} in progress • ${tasksByStatus.done.length} completed`
+                  }
+                </div>
+              )}
+            </div>
+            
+            {/* Filter pills */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-stone-500 mr-1">Filter:</span>
+              <FilterPill 
+                label="All" 
+                isActive={priorityFilter === "all"} 
+                onClick={() => setPriorityFilter("all")}
+              />
+              <FilterPill 
+                label="⚡ High" 
+                isActive={priorityFilter === "high"} 
+                onClick={() => setPriorityFilter("high")}
+                count={tasks?.filter(t => t.priority === "high").length}
+              />
+              <FilterPill 
+                label="Medium" 
+                isActive={priorityFilter === "medium"} 
+                onClick={() => setPriorityFilter("medium")}
+                count={tasks?.filter(t => t.priority === "medium").length}
+              />
+              <FilterPill 
+                label="Low" 
+                isActive={priorityFilter === "low"} 
+                onClick={() => setPriorityFilter("low")}
+                count={tasks?.filter(t => t.priority === "low").length}
+              />
+              
+              {/* Agent filter indicator */}
+              {agentFilter && agents && (
+                <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-blue-100 rounded-full text-xs">
+                  <span className="text-blue-700">
+                    👤 {agents.find(a => a._id === agentFilter)?.name}
+                  </span>
+                  <button 
+                    onClick={() => setAgentFilter(null)}
+                    className="text-blue-500 hover:text-blue-700 ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              
+              {/* Clear all filters */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-stone-500 hover:text-stone-700 ml-2"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
           
-          <div className="flex gap-4 overflow-x-auto pb-4 pr-4">
+          {/* Kanban board */}
+          <div className="flex gap-3 lg:gap-4 overflow-x-auto pb-4 pr-4 flex-1">
             {Object.entries(tasksByStatus).map(([status, statusTasks]) => (
-              <div key={status} className="flex-shrink-0 w-72">
+              <div key={status} className="flex-shrink-0 w-64 lg:w-72">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-base">{statusIcons[status]}</span>
                   <span className="text-xs font-semibold text-stone-600 uppercase">
@@ -314,7 +524,7 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <div className={`${statusColors[status]} rounded-lg p-2 min-h-[200px] space-y-2`}>
+                <div className={`${statusColors[status]} rounded-lg p-2 min-h-[200px] max-h-[calc(100vh-280px)] overflow-y-auto space-y-2`}>
                   {isTasksLoading ? (
                     <>
                       <TaskCardSkeleton />
@@ -326,10 +536,13 @@ export default function Home() {
                         key={task._id}
                         className="bg-white rounded-lg p-3 shadow-sm border border-stone-200 hover:shadow-md transition-all cursor-pointer group"
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-medium text-stone-800 text-sm group-hover:text-blue-600 transition-colors">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h3 className="font-medium text-stone-800 text-sm group-hover:text-blue-600 transition-colors line-clamp-2">
                             {task.title}
                           </h3>
+                          {task.priority === "high" && (
+                            <span className="text-red-500 flex-shrink-0">⚡</span>
+                          )}
                         </div>
                         <div className="text-xs text-stone-400 mb-2 flex items-center gap-1">
                           <span>📅</span>
@@ -338,7 +551,7 @@ export default function Home() {
                               day: "2-digit",
                               month: "2-digit",
                             })}
-                            {" às "}
+                            {" • "}
                             {new Date(task.createdAt).toLocaleTimeString("pt-BR", {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -360,14 +573,14 @@ export default function Home() {
                                   title={assignee.name}
                                 >
                                   <span>{assignee.emoji}</span>
-                                  <span>{assignee.name}</span>
+                                  <span className="hidden sm:inline">{assignee.name}</span>
                                 </div>
                               ) : null;
                             })}
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1">
-                          {task.tags?.map((tag) => (
+                          {task.tags?.slice(0, 3).map((tag) => (
                             <span
                               key={tag}
                               className="text-xs px-2 py-0.5 bg-stone-100 text-stone-600 rounded"
@@ -375,16 +588,18 @@ export default function Home() {
                               {tag}
                             </span>
                           ))}
+                          {task.tags && task.tags.length > 3 && (
+                            <span className="text-xs text-stone-400">
+                              +{task.tags.length - 3}
+                            </span>
+                          )}
                         </div>
-                        {task.priority === "high" && (
-                          <div className="mt-2 text-xs text-red-600 font-medium">⚡ High Priority</div>
-                        )}
                       </div>
                     ))
                   ) : (
                     <div className="text-center text-stone-400 text-sm py-8">
                       <div className="text-2xl mb-1 opacity-50">{statusIcons[status]}</div>
-                      Empty
+                      {hasActiveFilters ? "No matching tasks" : "Empty"}
                     </div>
                   )}
                 </div>
@@ -394,7 +609,9 @@ export default function Home() {
         </main>
 
         {/* Right Sidebar - Feed & Chat */}
-        <aside className="w-80 bg-white border-l border-stone-200 flex flex-col min-h-[calc(100vh-73px)]">
+        <aside className={`${
+          mobileView === "chat" ? "flex" : "hidden"
+        } md:flex w-full md:w-80 bg-white border-l border-stone-200 flex-col min-h-[calc(100vh-73px)] md:min-h-[calc(100vh-73px)]`}>
           {/* Tabs */}
           <div className="flex border-b border-stone-200">
             <button
@@ -424,7 +641,6 @@ export default function Home() {
             {activeTab === "feed" ? (
               <div className="space-y-3">
                 {isActivitiesLoading ? (
-                  // Loading skeletons for activities
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex gap-3">
                       <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
@@ -458,7 +674,6 @@ export default function Home() {
             ) : (
               <div className="space-y-3">
                 {isChatLoading ? (
-                  // Loading skeletons for chat
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex gap-2">
                       <Skeleton className="w-7 h-7 rounded-full flex-shrink-0" />
