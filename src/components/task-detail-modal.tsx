@@ -72,7 +72,7 @@ export function TaskDetailModal({ open, onOpenChange, taskId }: TaskDetailModalP
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 px-6">
           {/* Description */}
           {task.description && (
             <div>
