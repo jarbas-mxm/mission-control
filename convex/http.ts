@@ -493,6 +493,164 @@ http.route({
   }),
 });
 
+// ============ START/FINISH TASK (Simple Endpoints) ============
+
+http.route({
+  path: "/api/task/start",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+http.route({
+  path: "/api/task/finish",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+http.route({
+  path: "/api/task/get",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+// POST /api/task/start - Agente inicia uma task (by taskNumber or title)
+http.route({
+  path: "/api/task/start",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      
+      if (!body.agentName) {
+        return errorResponse("agentName is required");
+      }
+      
+      // Find task by taskNumber, title, or taskId
+      let taskId = body.taskId;
+      
+      if (!taskId && (body.taskNumber || body.title)) {
+        const tasks = await ctx.runQuery(api.tasks.list, {});
+        const task = tasks.find((t: any) => 
+          (body.taskNumber && t.taskNumber === body.taskNumber) ||
+          (body.title && t.title.toLowerCase().includes(body.title.toLowerCase()))
+        );
+        if (task) taskId = task._id;
+      }
+      
+      if (!taskId) {
+        return errorResponse("Task not found. Provide taskId, taskNumber, or title");
+      }
+      
+      const result = await ctx.runMutation(api.agents.claimTask, {
+        agentName: body.agentName,
+        taskId: taskId,
+      });
+      
+      return jsonResponse({ 
+        success: true,
+        message: `${body.agentName} started task`,
+        ...result,
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
+// POST /api/task/finish - Agente finaliza uma task
+http.route({
+  path: "/api/task/finish",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      
+      if (!body.agentName) {
+        return errorResponse("agentName is required");
+      }
+      
+      // Find task by taskNumber, title, or taskId
+      let taskId = body.taskId;
+      
+      if (!taskId && (body.taskNumber || body.title)) {
+        const tasks = await ctx.runQuery(api.tasks.list, {});
+        const task = tasks.find((t: any) => 
+          (body.taskNumber && t.taskNumber === body.taskNumber) ||
+          (body.title && t.title.toLowerCase().includes(body.title.toLowerCase()))
+        );
+        if (task) taskId = task._id;
+      }
+      
+      // If still no taskId, try to get from agent's currentTaskId
+      if (!taskId) {
+        const agent = await ctx.runQuery(api.agents.getByName, { name: body.agentName });
+        if (agent && agent.currentTaskId) {
+          taskId = agent.currentTaskId;
+        }
+      }
+      
+      if (!taskId) {
+        return errorResponse("Task not found. Provide taskId, taskNumber, title, or agent must have a current task");
+      }
+      
+      const result = await ctx.runMutation(api.agents.completeTask, {
+        agentName: body.agentName,
+        taskId: taskId,
+      });
+      
+      return jsonResponse({ 
+        success: true,
+        message: `${body.agentName} completed task`,
+        ...result,
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
+// GET /api/task/get?number=1 or ?title=xxx - Get task details
+http.route({
+  path: "/api/task/get",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const taskNumber = url.searchParams.get("number");
+      const title = url.searchParams.get("title");
+      const id = url.searchParams.get("id");
+      
+      if (!taskNumber && !title && !id) {
+        return errorResponse("Provide number, title, or id query param");
+      }
+      
+      const tasks = await ctx.runQuery(api.tasks.list, {});
+      
+      let task = null;
+      if (id) {
+        task = tasks.find((t: any) => t._id === id);
+      } else if (taskNumber) {
+        task = tasks.find((t: any) => t.taskNumber === parseInt(taskNumber));
+      } else if (title) {
+        task = tasks.find((t: any) => 
+          t.title.toLowerCase().includes(title.toLowerCase())
+        );
+      }
+      
+      if (!task) {
+        return errorResponse("Task not found", 404);
+      }
+      
+      return jsonResponse({ 
+        success: true,
+        task,
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
 // ============ HEALTH CHECK ============
 
 http.route({
