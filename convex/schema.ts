@@ -28,8 +28,15 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_status", ["status"]),
 
+  // Counters for sequential IDs
+  counters: defineTable({
+    name: v.string(),
+    value: v.number(),
+  }).index("by_name", ["name"]),
+
   // Tasks do Kanban
   tasks: defineTable({
+    taskNumber: v.optional(v.number()), // Sequential ID (#001, #002, etc)
     title: v.string(),
     description: v.optional(v.string()),
     status: v.union(

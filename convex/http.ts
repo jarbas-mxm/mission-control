@@ -386,6 +386,113 @@ http.route({
   }),
 });
 
+// ============ NOTIFICATION ENDPOINTS ============
+
+http.route({
+  path: "/api/notifications/pending",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+http.route({
+  path: "/api/notifications/create",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+http.route({
+  path: "/api/notifications/mark-delivered",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+// GET /api/notifications/pending?agent=Jarbas - Get pending notifications
+http.route({
+  path: "/api/notifications/pending",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const agentName = url.searchParams.get("agent");
+      
+      if (!agentName) {
+        return errorResponse("agent query param is required");
+      }
+      
+      const notifications = await ctx.runQuery(api.notifications.getUndelivered, {
+        agentName: agentName,
+      });
+      
+      return jsonResponse({ 
+        success: true,
+        count: notifications.length,
+        notifications,
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
+// POST /api/notifications/create - Create a notification
+http.route({
+  path: "/api/notifications/create",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      
+      if (!body.toAgent) {
+        return errorResponse("toAgent is required");
+      }
+      if (!body.content) {
+        return errorResponse("content is required");
+      }
+      
+      const id = await ctx.runMutation(api.notifications.create, {
+        mentionedAgentName: body.toAgent,
+        fromAgentName: body.fromAgent,
+        taskId: body.taskId,
+        content: body.content,
+      });
+      
+      return jsonResponse({ 
+        success: true,
+        id,
+        message: `Notification created for ${body.toAgent}`
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
+// POST /api/notifications/mark-delivered - Mark notification as delivered
+http.route({
+  path: "/api/notifications/mark-delivered",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      
+      if (!body.id) {
+        return errorResponse("id is required");
+      }
+      
+      await ctx.runMutation(api.notifications.markDelivered, {
+        id: body.id,
+      });
+      
+      return jsonResponse({ 
+        success: true,
+        message: "Notification marked as delivered"
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
 // ============ HEALTH CHECK ============
 
 http.route({

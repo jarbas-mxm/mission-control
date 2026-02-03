@@ -90,6 +90,7 @@ export function KanbanBoard({ filterAgentId, onCreateTask }: KanbanBoardProps) {
 
 interface Task {
   _id: Id<"tasks">;
+  taskNumber?: number;
   title: string;
   description?: string;
   status: string;
@@ -255,8 +256,13 @@ function TaskCard({ task, onOpenDetail }: { task: Task; onOpenDetail?: () => voi
         </>
       )}
 
-      {/* Title */}
+      {/* Title with ID */}
       <h3 className="text-xs md:text-sm font-medium text-stone-800 mb-1 md:mb-1.5 pr-6 line-clamp-2">
+        {task.taskNumber && (
+          <span className="text-stone-400 font-normal mr-1">
+            #{String(task.taskNumber).padStart(3, '0')}
+          </span>
+        )}
         {task.title}
       </h3>
 

@@ -370,3 +370,49 @@ export const remove = mutation({
     return { deleted: args.name };
   },
 });
+
+// Atualizar agente por nome (parcial)
+export const updateByName = mutation({
+  args: {
+    name: v.string(),
+    updates: v.object({
+      role: v.optional(v.string()),
+      emoji: v.optional(v.string()),
+      avatar: v.optional(v.string()),
+      status: v.optional(v.union(
+        v.literal("idle"),
+        v.literal("working"),
+        v.literal("offline")
+      )),
+      level: v.optional(v.union(
+        v.literal("lead"),
+        v.literal("specialist"),
+        v.literal("intern")
+      )),
+      sessionKey: v.optional(v.string()),
+      currentTaskId: v.optional(v.id("tasks")),
+      lastSeen: v.optional(v.number()),
+      tasksCompleted: v.optional(v.number()),
+      totalTokensUsed: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+
+    if (!agent) throw new Error(`Agent ${args.name} not found`);
+
+    // Filter out undefined values
+    const cleanUpdates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(args.updates)) {
+      if (value !== undefined) {
+        cleanUpdates[key] = value;
+      }
+    }
+
+    await ctx.db.patch(agent._id, cleanUpdates);
+    return agent._id;
+  },
+});

@@ -107,7 +107,14 @@ export function TaskDetailModal({ open, onOpenChange, taskId }: TaskDetailModalP
               <span className="text-red-500 text-lg">⚡</span>
             )}
             <div className="flex-1">
-              <DialogTitle className="text-lg leading-tight">{task.title}</DialogTitle>
+              <DialogTitle className="text-lg leading-tight">
+                {task.taskNumber && (
+                  <span className="text-stone-400 font-normal mr-2">
+                    #{String(task.taskNumber).padStart(3, '0')}
+                  </span>
+                )}
+                {task.title}
+              </DialogTitle>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {/* Status badge */}
                 <span className={cn(

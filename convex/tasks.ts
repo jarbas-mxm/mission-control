@@ -153,6 +153,24 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // Get next task number
+    let counter = await ctx.db
+      .query("counters")
+      .withIndex("by_name", (q) => q.eq("name", "tasks"))
+      .first();
+
+    let taskNumber: number;
+    if (counter) {
+      taskNumber = counter.value + 1;
+      await ctx.db.patch(counter._id, { value: taskNumber });
+    } else {
+      // Initialize counter - check existing tasks to get max number
+      const allTasks = await ctx.db.query("tasks").collect();
+      const maxNumber = allTasks.reduce((max, t) => Math.max(max, t.taskNumber || 0), 0);
+      taskNumber = maxNumber + 1;
+      await ctx.db.insert("counters", { name: "tasks", value: taskNumber });
+    }
+
     // Resolver nomes para IDs
     const assigneeIds: any[] = [];
     if (args.assigneeNames) {
@@ -178,6 +196,7 @@ export const create = mutation({
     const status = assigneeIds.length > 0 ? "assigned" : "inbox";
 
     const taskId = await ctx.db.insert("tasks", {
+      taskNumber,
       title: args.title,
       description: args.description,
       status,

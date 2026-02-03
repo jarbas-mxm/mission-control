@@ -14,6 +14,7 @@ import type * as events from "../events.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
+import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
 import type * as tasks from "../tasks.js";
 import type * as terminalLogs from "../terminalLogs.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   messages: typeof messages;
   metrics: typeof metrics;
+  migrations: typeof migrations;
   notifications: typeof notifications;
   tasks: typeof tasks;
   terminalLogs: typeof terminalLogs;
