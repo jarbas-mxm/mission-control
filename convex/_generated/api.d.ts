@@ -10,12 +10,14 @@
 
 import type * as activities from "../activities.js";
 import type * as agents from "../agents.js";
+import type * as crons from "../crons.js";
 import type * as events from "../events.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
 import type * as metrics from "../metrics.js";
 import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
+import type * as sync from "../sync.js";
 import type * as tasks from "../tasks.js";
 import type * as terminalLogs from "../terminalLogs.js";
 import type * as usage from "../usage.js";
@@ -29,12 +31,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   agents: typeof agents;
+  crons: typeof crons;
   events: typeof events;
   http: typeof http;
   messages: typeof messages;
   metrics: typeof metrics;
   migrations: typeof migrations;
   notifications: typeof notifications;
+  sync: typeof sync;
   tasks: typeof tasks;
   terminalLogs: typeof terminalLogs;
   usage: typeof usage;

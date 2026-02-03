@@ -24,6 +24,8 @@ export default defineSchema({
     // Métricas
     tasksCompleted: v.optional(v.number()),
     totalTokensUsed: v.optional(v.number()),
+    // Notion sync
+    notionId: v.optional(v.string()),
   })
     .index("by_name", ["name"])
     .index("by_status", ["status"]),
@@ -75,6 +77,8 @@ export default defineSchema({
       addedBy: v.optional(v.string()),
       addedAt: v.number(),
     }))),
+    // Notion sync
+    notionId: v.optional(v.string()),
   })
     .index("by_status", ["status"])
     .index("by_assignee", ["assigneeIds"])

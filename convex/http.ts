@@ -651,6 +651,54 @@ http.route({
   }),
 });
 
+// ============ NOTION SYNC ============
+
+http.route({
+  path: "/api/sync/notion",
+  method: "OPTIONS",
+  handler: httpAction(async () => new Response(null, { headers: corsHeaders })),
+});
+
+// POST /api/sync/notion - Sync from Notion to Convex
+http.route({
+  path: "/api/sync/notion",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const result = await ctx.runAction(api.sync.syncFromNotion, {});
+      
+      return jsonResponse({
+        success: result.success,
+        tasksUpdated: result.tasksUpdated,
+        agentsUpdated: result.agentsUpdated,
+        errors: result.errors,
+        timestamp: Date.now(),
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
+// GET /api/sync/notion - Get last sync time
+http.route({
+  path: "/api/sync/notion",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    try {
+      const lastSync = await ctx.runMutation(api.sync.getLastSync, {});
+      
+      return jsonResponse({
+        success: true,
+        lastSync,
+        lastSyncAgo: lastSync ? `${Math.round((Date.now() - lastSync) / 1000)}s ago` : "never",
+      });
+    } catch (error: any) {
+      return errorResponse(error.message, 500);
+    }
+  }),
+});
+
 // ============ HEALTH CHECK ============
 
 http.route({

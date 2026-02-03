@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,29 @@ export function Header({ onCreateTask }: HeaderProps) {
   const stats = useQuery(api.agents.getStats);
   const isLoading = stats === undefined;
   const router = useRouter();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
+  const syncFromNotion = useAction(api.sync.syncFromNotion);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setLastSyncResult(null);
+    try {
+      const result = await syncFromNotion({});
+      if (result.success) {
+        setLastSyncResult(`✓ ${result.tasksUpdated} tasks, ${result.agentsUpdated} agents`);
+      } else {
+        setLastSyncResult(`✗ ${result.errors.join(", ")}`);
+      }
+      // Clear message after 5 seconds
+      setTimeout(() => setLastSyncResult(null), 5000);
+    } catch (error: any) {
+      setLastSyncResult(`✗ ${error.message}`);
+      setTimeout(() => setLastSyncResult(null), 5000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleLogout = async () => {
     await fetch("/api/auth", { method: "DELETE" });
@@ -55,6 +79,31 @@ export function Header({ onCreateTask }: HeaderProps) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 md:gap-4">
+          {/* Sync Button */}
+          <Button
+            onClick={handleSync}
+            size="sm"
+            variant="outline"
+            disabled={isSyncing}
+            className="hidden md:inline-flex gap-1"
+            title="Sincronizar com Notion"
+          >
+            <span className={cn(isSyncing && "animate-spin")}>🔄</span>
+            {isSyncing ? "Syncing..." : "Sync"}
+          </Button>
+          
+          {/* Sync Result Toast */}
+          {lastSyncResult && (
+            <span className={cn(
+              "text-xs px-2 py-1 rounded",
+              lastSyncResult.startsWith("✓") 
+                ? "bg-green-100 text-green-700" 
+                : "bg-red-100 text-red-700"
+            )}>
+              {lastSyncResult}
+            </span>
+          )}
+
           {/* Create Task Button - hidden on mobile (using FAB instead) */}
           {onCreateTask && (
             <Button
