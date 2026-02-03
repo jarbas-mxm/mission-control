@@ -77,3 +77,40 @@ export const cleanup = mutation({
     return { deleted };
   },
 });
+
+// Adicionar log pelo nome do agente (para API HTTP)
+export const addByName = mutation({
+  args: {
+    agentName: v.string(),
+    level: v.union(
+      v.literal("info"),
+      v.literal("success"),
+      v.literal("warning"),
+      v.literal("error"),
+      v.literal("system")
+    ),
+    message: v.string(),
+    taskId: v.optional(v.id("tasks")),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    // Buscar agente pelo nome
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_name", (q) => q.eq("name", args.agentName))
+      .first();
+    
+    if (!agent) {
+      throw new Error(`Agent "${args.agentName}" not found`);
+    }
+    
+    return await ctx.db.insert("terminalLogs", {
+      agentId: agent._id,
+      level: args.level,
+      message: args.message,
+      taskId: args.taskId,
+      metadata: args.metadata,
+      createdAt: Date.now(),
+    });
+  },
+});

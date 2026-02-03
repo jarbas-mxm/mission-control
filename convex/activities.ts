@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 // Lista atividades recentes (com enriquecimento)
@@ -194,5 +194,38 @@ export const getAgentActivityCounts = query({
     }));
 
     return counts.sort((a, b) => b.count - a.count);
+  },
+});
+
+// ============ MUTATIONS ============
+
+// Registrar atividade (usado pela API HTTP)
+export const log = mutation({
+  args: {
+    type: v.string(),
+    agentName: v.optional(v.string()),
+    taskId: v.optional(v.id("tasks")),
+    message: v.string(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let agentId = undefined;
+    
+    if (args.agentName) {
+      const agent = await ctx.db
+        .query("agents")
+        .withIndex("by_name", (q) => q.eq("name", args.agentName))
+        .first();
+      if (agent) agentId = agent._id;
+    }
+    
+    return await ctx.db.insert("activities", {
+      type: args.type,
+      agentId,
+      taskId: args.taskId,
+      message: args.message,
+      metadata: args.metadata,
+      createdAt: Date.now(),
+    });
   },
 });
