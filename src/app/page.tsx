@@ -4,11 +4,10 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 import { AgentsSidebar } from "@/components/agents-sidebar";
 import { KanbanBoard } from "@/components/kanban-board";
-import { LiveFeed } from "@/components/live-feed";
 import { TaskModal } from "@/components/task-modal";
 import { cn } from "@/lib/utils";
 
-type MobileTab = "kanban" | "agents" | "feed";
+type MobileTab = "kanban" | "agents";
 
 export default function MissionControl() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -33,12 +32,6 @@ export default function MissionControl() {
           onClick={() => setMobileTab("agents")}
           icon="🤖"
           label="Agents"
-        />
-        <MobileTabButton
-          active={mobileTab === "feed"}
-          onClick={() => setMobileTab("feed")}
-          icon="📡"
-          label="Feed"
         />
       </div>
 
@@ -79,19 +72,6 @@ export default function MissionControl() {
             onCreateTask={() => setShowTaskModal(true)}
           />
         </main>
-
-        {/* Right Sidebar - Live Feed (hidden on mobile unless tab selected) */}
-        <aside
-          className={cn(
-            "bg-white border-l border-stone-200 flex-shrink-0",
-            // Desktop: always visible, fixed width
-            "hidden lg:block lg:w-80",
-            // Mobile: full width when selected
-            mobileTab === "feed" && "block w-full lg:w-80"
-          )}
-        >
-          <LiveFeed />
-        </aside>
       </div>
 
       {/* Mobile FAB for creating tasks */}
