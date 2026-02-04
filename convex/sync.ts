@@ -336,9 +336,9 @@ export const upsertAgents = internalMutation({
 
 // ============ SCHEDULED SYNC (called by cron) ============
 
-export const scheduledSync = internalAction({
+export const scheduledSync: ReturnType<typeof internalAction> = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ success: boolean; tasksUpdated: number; agentsUpdated: number; errors: string[] }> => {
     console.log("🔄 Starting scheduled Notion sync...");
     
     const result = await ctx.runAction(api.sync.syncFromNotion, {});

@@ -55,6 +55,40 @@ export const markDelivered = mutation({
   },
 });
 
+// Buscar todas notificações não entregues com detalhes (para UI)
+export const getAllUndeliveredWithDetails = query({
+  args: {},
+  handler: async (ctx) => {
+    const notifications = await ctx.db
+      .query("notifications")
+      .filter((q) => q.eq(q.field("delivered"), false))
+      .order("desc")
+      .collect();
+    
+    // Enriquecer com nomes e detalhes
+    const enriched = await Promise.all(
+      notifications.map(async (notif) => {
+        const mentionedAgent = await ctx.db.get(notif.mentionedAgentId);
+        const fromAgent = notif.fromAgentId 
+          ? await ctx.db.get(notif.fromAgentId) 
+          : null;
+        const task = notif.taskId 
+          ? await ctx.db.get(notif.taskId) 
+          : null;
+        
+        return {
+          ...notif,
+          agentName: mentionedAgent?.name,
+          fromAgentName: fromAgent?.name,
+          taskTitle: task?.title,
+        };
+      })
+    );
+    
+    return enriched;
+  },
+});
+
 // Criar notificação manual (@mention)
 export const create = mutation({
   args: {

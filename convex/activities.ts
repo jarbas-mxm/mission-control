@@ -199,10 +199,27 @@ export const getAgentActivityCounts = query({
 
 // ============ MUTATIONS ============
 
+// Tipos válidos de atividade
+const activityTypes = v.union(
+  v.literal("message_sent"),
+  v.literal("agent_status_changed"),
+  v.literal("task_created"),
+  v.literal("task_assigned"),
+  v.literal("task_started"),
+  v.literal("task_completed"),
+  v.literal("task_updated"),
+  v.literal("task_commented"),
+  v.literal("agent_online"),
+  v.literal("agent_offline"),
+  v.literal("agent_working"),
+  v.literal("document_created"),
+  v.literal("decision_made")
+);
+
 // Registrar atividade (usado pela API HTTP)
 export const log = mutation({
   args: {
-    type: v.string(),
+    type: activityTypes,
     agentName: v.optional(v.string()),
     taskId: v.optional(v.id("tasks")),
     message: v.string(),
@@ -212,9 +229,10 @@ export const log = mutation({
     let agentId = undefined;
     
     if (args.agentName) {
+      const agentName = args.agentName;
       const agent = await ctx.db
         .query("agents")
-        .withIndex("by_name", (q) => q.eq("name", args.agentName))
+        .withIndex("by_name", (q) => q.eq("name", agentName))
         .first();
       if (agent) agentId = agent._id;
     }

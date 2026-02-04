@@ -8,6 +8,7 @@ crons.interval(
   "sync-notion-tasks",
   { minutes: 2 },
   internal.sync.scheduledSync,
+  {},
 );
 
 export default crons;

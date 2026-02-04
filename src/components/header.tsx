@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Clock } from "@/components/clock";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { NotificationsDropdown } from "@/components/notifications-dropdown";
 
 interface HeaderProps {
   onCreateTask?: () => void;
@@ -114,6 +115,9 @@ export function Header({ onCreateTask }: HeaderProps) {
               + New Task
             </Button>
           )}
+
+          {/* Notifications */}
+          <NotificationsDropdown />
 
           {/* Clock - hidden on mobile */}
           <div className="hidden md:block">
