@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CommentsList } from "@/components/comments-list";
+import { CommentInput } from "@/components/comment-input";
 
 interface TaskDetailModalProps {
   open: boolean;
@@ -121,6 +123,15 @@ export function TaskDetailModal({ open, onOpenChange, taskId }: TaskDetailModalP
               No details available
             </p>
           )}
+
+          {/* Comments Section */}
+          <div className="border-t border-stone-100 pt-4 mt-4">
+            <h3 className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-3">
+              Comments
+            </h3>
+            <CommentsList taskId={taskId} className="max-h-48 overflow-y-auto mb-3" />
+            <CommentInput taskId={taskId} />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
