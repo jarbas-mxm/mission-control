@@ -22,7 +22,7 @@ interface Agent {
 
 interface AgentsSidebarProps {
   selectedAgentId?: string;
-  onAgentSelect?: (agentId: string | null) => void;
+  onAgentSelect?: (agentId: string | null, agentName?: string) => void;
 }
 
 export function AgentsSidebar({
@@ -96,7 +96,8 @@ export function AgentsSidebar({
                 isSelected={selectedAgentId === agent._id}
                 onSelect={() =>
                   onAgentSelect?.(
-                    selectedAgentId === agent._id ? null : agent._id
+                    selectedAgentId === agent._id ? null : agent._id,
+                    selectedAgentId === agent._id ? undefined : agent.name
                   )
                 }
               />

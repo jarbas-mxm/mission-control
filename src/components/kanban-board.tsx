@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -10,8 +10,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { FilterState } from "@/components/search-filters-bar";
 
-const COLUMN_ORDER: TaskStatus[] = [
+const COLUMN_ORDER_DEFAULT: TaskStatus[] = [
+  "inbox",
+  "assigned",
+  "in_progress",
+];
+
+const COLUMN_ORDER_WITH_DONE: TaskStatus[] = [
+  "inbox",
+  "assigned",
+  "in_progress",
+  "done",
+];
+
+// All available statuses for the move menu
+const ALL_STATUSES: TaskStatus[] = [
   "inbox",
   "assigned",
   "in_progress",
@@ -20,13 +35,67 @@ const COLUMN_ORDER: TaskStatus[] = [
 
 interface KanbanBoardProps {
   filterAgentId?: string;
+  filters?: FilterState;
   onCreateTask?: () => void;
 }
 
-export function KanbanBoard({ filterAgentId, onCreateTask }: KanbanBoardProps) {
+export function KanbanBoard({ filterAgentId, filters, onCreateTask }: KanbanBoardProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<Id<"tasks"> | null>(null);
   const kanban = useQuery(api.tasks.getKanban);
   const isLoading = kanban === undefined;
+
+  // Determine which columns to show
+  const COLUMN_ORDER = filters?.showDone ? COLUMN_ORDER_WITH_DONE : COLUMN_ORDER_DEFAULT;
+
+  // Helper function to filter tasks
+  const filterTasks = useMemo(() => {
+    return (tasks: Task[]) => {
+      let filtered = tasks;
+
+      // Agent filter
+      if (filterAgentId) {
+        filtered = filtered.filter((t) =>
+          t.assignees?.some((a) => a?._id === filterAgentId)
+        );
+      }
+
+      // Priority filter
+      if (filters?.priority && filters.priority !== "all") {
+        filtered = filtered.filter((t) => t.priority === filters.priority);
+      }
+
+      // Search filter
+      if (filters?.search) {
+        const searchLower = filters.search.toLowerCase();
+        filtered = filtered.filter(
+          (t) =>
+            t.title.toLowerCase().includes(searchLower) ||
+            t.description?.toLowerCase().includes(searchLower) ||
+            t.tags?.some((tag) => tag.toLowerCase().includes(searchLower)) ||
+            (t.taskNumber && `#${String(t.taskNumber).padStart(3, '0')}`.includes(searchLower))
+        );
+      }
+
+      // Sort
+      if (filters?.sortBy) {
+        filtered = [...filtered].sort((a, b) => {
+          switch (filters.sortBy) {
+            case "oldest":
+              return a.createdAt - b.createdAt;
+            case "priority": {
+              const priorityOrder = { high: 0, medium: 1, low: 2 };
+              return (priorityOrder[a.priority || "medium"] || 1) - (priorityOrder[b.priority || "medium"] || 1);
+            }
+            case "newest":
+            default:
+              return b.createdAt - a.createdAt;
+          }
+        });
+      }
+
+      return filtered;
+    };
+  }, [filterAgentId, filters]);
 
   return (
     <div className="flex flex-col h-full">
@@ -57,17 +126,13 @@ export function KanbanBoard({ filterAgentId, onCreateTask }: KanbanBoardProps) {
         <div className="flex gap-3 md:gap-4 p-3 md:p-4 min-h-full min-w-max">
           {COLUMN_ORDER.map((status) => {
             const tasks = kanban?.[status] || [];
-            const filteredTasks = filterAgentId
-              ? tasks.filter((t) =>
-                  t.assignees?.some((a) => a?._id === filterAgentId)
-                )
-              : tasks;
+            const filteredTasks = filterTasks(tasks as Task[]);
 
             return (
               <KanbanColumn
                 key={status}
                 status={status}
-                tasks={filteredTasks as Task[]}
+                tasks={filteredTasks}
                 isLoading={isLoading}
                 onOpenTask={setSelectedTaskId}
               />
@@ -234,7 +299,7 @@ function TaskCard({ task, onOpenDetail }: { task: Task; onOpenDetail?: () => voi
             <div className="px-2 py-1 text-[10px] text-stone-400 uppercase">
               Move to
             </div>
-            {COLUMN_ORDER.filter((s) => s !== task.status).map((status) => (
+            {ALL_STATUSES.filter((s) => s !== task.status).map((status) => (
               <button
                 key={status}
                 onClick={() => handleMove(status)}

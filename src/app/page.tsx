@@ -1,23 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { AgentsSidebar } from "@/components/agents-sidebar";
 import { KanbanBoard } from "@/components/kanban-board";
 import { TaskModal } from "@/components/task-modal";
+import { SearchFiltersBar, type FilterState } from "@/components/search-filters-bar";
 import { cn } from "@/lib/utils";
 
 type MobileTab = "kanban" | "agents";
 
+const defaultFilters: FilterState = {
+  search: "",
+  priority: "all",
+  sortBy: "newest",
+  showDone: false,
+};
+
 export default function MissionControl() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("kanban");
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+
+  // Get task counts for filter badges
+  const kanban = useQuery(api.tasks.getKanban);
+  
+  const taskCounts = useMemo(() => {
+    if (!kanban) return undefined;
+    
+    const allTasks = [
+      ...kanban.inbox,
+      ...kanban.assigned,
+      ...kanban.in_progress,
+    ];
+    
+    return {
+      total: allTasks.length,
+      high: allTasks.filter((t) => t.priority === "high").length,
+      medium: allTasks.filter((t) => t.priority === "medium").length,
+      low: allTasks.filter((t) => t.priority === "low").length,
+      done: kanban.done.length,
+    };
+  }, [kanban]);
+
+  const agentFilter = selectedAgentId && selectedAgentName
+    ? { id: selectedAgentId, name: selectedAgentName }
+    : null;
 
   return (
     <div className="h-screen flex flex-col bg-stone-50">
       {/* Header */}
       <Header onCreateTask={() => setShowTaskModal(true)} />
+
+      {/* Search & Filters Bar */}
+      <SearchFiltersBar
+        filters={filters}
+        onFiltersChange={setFilters}
+        agentFilter={agentFilter}
+        onAgentFilterClear={() => {
+          setSelectedAgentId(null);
+          setSelectedAgentName(null);
+        }}
+        taskCounts={taskCounts}
+      />
 
       {/* Mobile Tabs - only visible on small screens */}
       <div className="md:hidden flex border-b border-stone-200 bg-white">
@@ -49,8 +98,9 @@ export default function MissionControl() {
         >
           <AgentsSidebar
             selectedAgentId={selectedAgentId ?? undefined}
-            onAgentSelect={(id) => {
+            onAgentSelect={(id, name) => {
               setSelectedAgentId(id);
+              setSelectedAgentName(name || null);
               // On mobile, switch to kanban after selecting
               if (window.innerWidth < 768 && id) {
                 setMobileTab("kanban");
@@ -69,6 +119,7 @@ export default function MissionControl() {
         >
           <KanbanBoard
             filterAgentId={selectedAgentId ?? undefined}
+            filters={filters}
             onCreateTask={() => setShowTaskModal(true)}
           />
         </main>
