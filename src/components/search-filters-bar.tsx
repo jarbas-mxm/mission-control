@@ -61,11 +61,13 @@ export function SearchFiltersBar({
 
   return (
     <div className="bg-white border-b border-stone-200 px-3 md:px-4 py-2 md:py-3">
-      <div className="flex flex-wrap items-center gap-2 md:gap-3">
+      {/* Main row - Search + Priority on mobile */}
+      <div className="flex items-center gap-2 md:gap-3">
         {/* Search Input */}
         <div
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all flex-1 min-w-[200px] max-w-md",
+            "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all flex-1 min-w-0",
+            "md:max-w-md",
             searchFocused
               ? "border-blue-400 ring-2 ring-blue-100"
               : "border-stone-200 hover:border-stone-300"
@@ -74,28 +76,26 @@ export function SearchFiltersBar({
           <span className="text-stone-400 text-sm">🔍</span>
           <input
             type="text"
-            placeholder="Search tasks..."
+            placeholder="Search..."
             value={filters.search}
             onChange={(e) => updateFilter("search", e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-stone-400"
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-stone-400 min-w-0"
           />
           {filters.search && (
             <button
               onClick={() => updateFilter("search", "")}
-              className="text-stone-400 hover:text-stone-600 text-xs"
+              className="text-stone-400 hover:text-stone-600 text-xs flex-shrink-0"
             >
               ✕
             </button>
           )}
         </div>
 
-        {/* Divider */}
-        <div className="hidden md:block w-px h-6 bg-stone-200" />
-
-        {/* Priority Filters */}
-        <div className="flex items-center gap-1">
+        {/* Desktop: Show divider + all priority pills */}
+        <div className="hidden md:flex items-center gap-2">
+          <div className="w-px h-6 bg-stone-200" />
           <PriorityPill
             label="All"
             isActive={filters.priority === "all"}
@@ -128,14 +128,26 @@ export function SearchFiltersBar({
           />
         </div>
 
-        {/* Divider */}
+        {/* Mobile: Compact priority dropdown */}
+        <select
+          value={filters.priority}
+          onChange={(e) => updateFilter("priority", e.target.value as Priority)}
+          className="md:hidden text-xs px-2 py-1.5 rounded border border-stone-200 bg-white cursor-pointer"
+        >
+          <option value="all">All</option>
+          <option value="high">⚡ High</option>
+          <option value="medium">● Med</option>
+          <option value="low">○ Low</option>
+        </select>
+
+        {/* Divider - desktop only */}
         <div className="hidden md:block w-px h-6 bg-stone-200" />
 
         {/* Show Done Toggle */}
         <button
           onClick={() => updateFilter("showDone", !filters.showDone)}
           className={cn(
-            "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all",
+            "flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-all flex-shrink-0",
             filters.showDone
               ? "bg-green-100 text-green-700"
               : "text-stone-500 hover:bg-stone-100"
@@ -156,41 +168,46 @@ export function SearchFiltersBar({
           )}
         </button>
 
-        {/* Sort Dropdown */}
+        {/* Sort Dropdown - hidden on very small screens */}
         <select
           value={filters.sortBy}
           onChange={(e) => updateFilter("sortBy", e.target.value as SortBy)}
-          className="text-xs px-2 py-1.5 rounded border border-stone-200 bg-white text-stone-600 cursor-pointer hover:border-stone-300 outline-none"
+          className="hidden sm:block text-xs px-2 py-1.5 rounded border border-stone-200 bg-white text-stone-600 cursor-pointer hover:border-stone-300 outline-none"
         >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="priority">By priority</option>
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="priority">Priority</option>
         </select>
-
-        {/* Agent Filter Badge */}
-        {agentFilter && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full text-xs">
-            <span className="text-blue-700">👤 {agentFilter.name}</span>
-            <button
-              onClick={onAgentFilterClear}
-              className="text-blue-500 hover:text-blue-700 ml-1"
-              aria-label="Clear agent filter"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Clear All */}
-        {hasFilters && (
-          <button
-            onClick={clearAllFilters}
-            className="text-xs text-stone-500 hover:text-stone-700 px-2 py-1 hover:bg-stone-100 rounded transition-colors"
-          >
-            Clear all
-          </button>
-        )}
       </div>
+
+      {/* Second row - Agent filter + Clear all (only when needed) */}
+      {(agentFilter || hasFilters) && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-100">
+          {/* Agent Filter Badge */}
+          {agentFilter && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full text-xs">
+              <span className="text-blue-700 truncate max-w-[100px]">👤 {agentFilter.name}</span>
+              <button
+                onClick={onAgentFilterClear}
+                className="text-blue-500 hover:text-blue-700 ml-1 flex-shrink-0"
+                aria-label="Clear agent filter"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Clear All */}
+          {hasFilters && (
+            <button
+              onClick={clearAllFilters}
+              className="text-xs text-stone-500 hover:text-stone-700 px-2 py-1 hover:bg-stone-100 rounded transition-colors ml-auto"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
