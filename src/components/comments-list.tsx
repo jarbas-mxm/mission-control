@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useRef, useEffect } from "react";
 import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -8,10 +9,56 @@ import type { Id } from "../../convex/_generated/dataModel";
 interface CommentsListProps {
   taskId: Id<"tasks">;
   className?: string;
+  autoScroll?: boolean;
 }
 
-export function CommentsList({ taskId, className }: CommentsListProps) {
+export function CommentsList({ taskId, className, autoScroll = true }: CommentsListProps) {
   const messages = useQuery(api.messages.listByTask, { taskId });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(0);
+  const isNearBottomRef = useRef(true);
+  
+  // Check if user is near the bottom (within 100px)
+  const checkIfNearBottom = () => {
+    const container = containerRef.current;
+    if (!container) return true;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    return scrollHeight - scrollTop - clientHeight < 100;
+  };
+  
+  // Update isNearBottom on scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const handleScroll = () => {
+      isNearBottomRef.current = checkIfNearBottom();
+    };
+    
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+  
+  // Auto-scroll when new messages arrive (only if user was near bottom)
+  useEffect(() => {
+    if (!messages || !autoScroll) return;
+    
+    const currentCount = messages.length;
+    const hadNewMessages = currentCount > prevCountRef.current;
+    
+    if (hadNewMessages && isNearBottomRef.current) {
+      // Scroll to bottom smoothly
+      setTimeout(() => {
+        containerRef.current?.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 50);
+    }
+    
+    prevCountRef.current = currentCount;
+  }, [messages, autoScroll]);
   
   if (messages === undefined) {
     return (
@@ -65,7 +112,10 @@ export function CommentsList({ taskId, className }: CommentsListProps) {
   };
   
   return (
-    <div className={cn("space-y-3", className)}>
+    <div 
+      ref={containerRef}
+      className={cn("space-y-3 overflow-y-auto", className)}
+    >
       {messages.map((message: any) => (
         <div key={message._id} className="flex gap-3">
           {/* Avatar */}
